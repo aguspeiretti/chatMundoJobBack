@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const Message = require("./models/Message");
 const cors = require("cors");
 const activeRooms = new Set(["General", "Random", "Ayuda"]);
+require("dotenv").config();
 app.use(
   cors({
     origin: "http://localhost:5173", // Actualizado para Vite
@@ -24,12 +25,16 @@ const io = new Server(server, {
 
 // Conectar a MongoDB
 mongoose
-  .connect("mongodb://localhost:27017/chat-app", {
+  .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000, // Tiempo máximo para intentar conectarse
   })
   .then(() => console.log("Conectado a MongoDB"))
-  .catch((err) => console.error("Error conectando a MongoDB:", err));
+  .catch((err) => {
+    console.error("Error conectando a MongoDB:", err.message);
+    process.exit(1); // Salir si no se puede conectar
+  });
 
 // Almacenar usuarios por sala
 const roomUsers = new Map();
