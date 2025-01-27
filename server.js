@@ -10,13 +10,13 @@ const activeRooms = new Set(["General", "Random", "Ayuda"]);
 require("dotenv").config();
 app.use(
   cors({
-    origin: "http://localhost:5173", // Actualizado para Vite
+    origin: "https://chatmundojob.onrender.com", // Actualizado para Vite
   })
 );
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Actualizado para Vite
+    origin: "https://chatmundojob.onrender.com", // Actualizado para Vite
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type"],
