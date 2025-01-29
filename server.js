@@ -1,13 +1,20 @@
 const express = require("express");
+const app = express();
 const http = require("http");
+const server = http.createServer(app);
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-const cors = require("cors");
 const Message = require("./models/Message");
+const cors = require("cors");
+
+const activeRooms = new Set(["General", "Random", "Ayuda"]);
 require("dotenv").config();
 
-const app = express();
-const server = http.createServer(app);
+app.use(
+  cors({
+    origin: "https://chatmundojob.onrender.com",
+  })
+);
 
 const io = new Server(server, {
   cors: {
@@ -18,7 +25,6 @@ const io = new Server(server, {
   },
 });
 
-// Conectar a MongoDB
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -31,35 +37,22 @@ mongoose
     process.exit(1);
   });
 
-// Salas activas y usuarios en salas
-const activeRooms = new Set(["General", "Random", "Ayuda"]);
+// Store users and their socket IDs
+const userSockets = new Map();
 const roomUsers = new Map();
-const privateChats = new Map();
 
 app.use(express.json());
-app.use(cors({ origin: "https://chatmundojob.onrender.com" }));
 
-// Obtener lista de salas
 app.get("/api/rooms", (req, res) => {
   res.json(Array.from(activeRooms));
 });
 
-// Crear una nueva sala
-app.post("/api/rooms", (req, res) => {
-  const { roomName } = req.body;
-  if (roomName && !activeRooms.has(roomName)) {
-    activeRooms.add(roomName);
-    io.emit("roomsUpdated", Array.from(activeRooms));
-    res.status(201).json({ message: "Sala creada exitosamente" });
-  } else {
-    res.status(400).json({ message: "Nombre de sala inválido o ya existe" });
-  }
-});
-
-// Obtener mensajes de una sala
 app.get("/api/messages/:room", async (req, res) => {
   try {
-    const messages = await Message.find({ room: req.params.room })
+    const messages = await Message.find({
+      room: req.params.room,
+      type: { $ne: "system" }, // Excluir mensajes del sistema
+    })
       .sort({ timestamp: -1 })
       .limit(50);
     res.json(messages.reverse());
@@ -69,75 +62,81 @@ app.get("/api/messages/:room", async (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  // Generar un ID aleatorio para el usuario
-  const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
-  socket.emit("userAssigned", userId);
-  console.log(`Usuario conectado: ${socket.id} (ID: ${userId})`);
+  console.log("Usuario conectado:", socket.id);
 
-  // Unirse a una sala
-  socket.on("joinRoom", ({ room }) => {
+  socket.on("joinRoom", ({ username, room }) => {
+    userSockets.set(username, socket.id);
     socket.join(room);
 
     if (!roomUsers.has(room)) {
       roomUsers.set(room, new Set());
     }
-    roomUsers.get(room).add(userId);
+    roomUsers.get(room).add(username);
 
     io.to(room).emit("roomUsers", Array.from(roomUsers.get(room)));
 
-    const message = new Message({
-      room,
+    // Enviar mensaje de conexión sin guardarlo en la base de datos
+    socket.to(room).emit("message", {
       username: "Sistema",
-      text: `${userId} se ha unido a la sala`,
-    });
-    message.save();
-
-    io.to(room).emit("message", {
-      username: "Sistema",
-      text: `${userId} se ha unido a la sala`,
+      text: `${username} se ha unido a la sala`,
       timestamp: new Date(),
+      type: "system",
     });
   });
 
-  // Manejar mensajes en salas
-  socket.on("sendMessage", async ({ room, message }) => {
+  socket.on("directMessage", async ({ from, to, message }) => {
+    const toSocketId = userSockets.get(to);
+    if (toSocketId) {
+      io.to(toSocketId).emit("message", {
+        username: from,
+        text: message,
+        timestamp: new Date(),
+        isDirect: true,
+      });
+
+      socket.emit("message", {
+        username: from,
+        text: message,
+        timestamp: new Date(),
+        isDirect: true,
+      });
+
+      const newMessage = new Message({
+        type: "direct",
+        from,
+        to,
+        text: message,
+      });
+      await newMessage.save();
+    }
+  });
+
+  socket.on("sendMessage", async ({ username, room, message }) => {
     const newMessage = new Message({
       room,
-      username: userId,
+      username,
       text: message,
+      type: "room",
     });
 
     try {
       await newMessage.save();
       io.to(room).emit("message", {
-        username: userId,
+        username,
         text: message,
         timestamp: newMessage.timestamp,
+        type: "room",
       });
     } catch (error) {
       console.error("Error al guardar mensaje:", error);
     }
   });
 
-  // Enviar mensaje privado
-  socket.on("sendPrivateMessage", ({ toUserId, message }) => {
-    if (!privateChats.has(userId)) {
-      privateChats.set(userId, new Map());
-    }
-    if (!privateChats.get(userId).has(toUserId)) {
-      privateChats.get(userId).set(toUserId, []);
-    }
-    privateChats.get(userId).get(toUserId).push({ from: userId, message });
-
-    io.to(toUserId).emit("privateMessage", { from: userId, message });
-  });
-
-  // Manejar desconexión y salida de sala
-  socket.on("leaveRoom", ({ room }) => {
+  socket.on("leaveRoom", async ({ username, room }) => {
     socket.leave(room);
 
     if (roomUsers.has(room)) {
-      roomUsers.get(room).delete(userId);
+      roomUsers.get(room).delete(username);
       if (roomUsers.get(room).size === 0) {
         roomUsers.delete(room);
         if (!["General", "Random", "Ayuda"].includes(room)) {
@@ -149,22 +148,43 @@ io.on("connection", (socket) => {
       }
     }
 
-    const message = new Message({
-      room,
+    // Enviar mensaje de desconexión sin guardarlo en la base de datos
+    socket.to(room).emit("message", {
       username: "Sistema",
-      text: `${userId} ha dejado la sala`,
-    });
-    message.save();
-
-    io.to(room).emit("message", {
-      username: "Sistema",
-      text: `${userId} ha dejado la sala`,
+      text: `${username} ha dejado la sala`,
       timestamp: new Date(),
+      type: "system",
     });
   });
 
   socket.on("disconnect", () => {
-    console.log(`Usuario desconectado: ${socket.id} (ID: ${userId})`);
+    let disconnectedUsername;
+    for (const [username, socketId] of userSockets.entries()) {
+      if (socketId === socket.id) {
+        disconnectedUsername = username;
+        userSockets.delete(username);
+        break;
+      }
+    }
+
+    if (disconnectedUsername) {
+      for (const [room, users] of roomUsers.entries()) {
+        if (users.has(disconnectedUsername)) {
+          users.delete(disconnectedUsername);
+          io.to(room).emit("roomUsers", Array.from(users));
+
+          // Enviar mensaje de desconexión sin guardarlo
+          io.to(room).emit("message", {
+            username: "Sistema",
+            text: `${disconnectedUsername} se ha desconectado`,
+            timestamp: new Date(),
+            type: "system",
+          });
+        }
+      }
+    }
+
+    console.log("Usuario desconectado:", socket.id);
   });
 });
 

@@ -1,18 +1,16 @@
 const mongoose = require("mongoose");
 
 const messageSchema = new mongoose.Schema({
-  room: {
+  type: {
     type: String,
-    required: true,
+    enum: ["room", "direct", "system"],
+    default: "room",
   },
-  username: {
-    type: String,
-    required: true,
-  },
-  text: {
-    type: String,
-    required: true,
-  },
+  room: String,
+  username: String,
+  text: String,
+  from: String,
+  to: String,
   timestamp: {
     type: Date,
     default: Date.now,
