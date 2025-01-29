@@ -76,13 +76,7 @@ io.on("connection", (socket) => {
     io.to(room).emit("roomUsers", Array.from(roomUsers.get(room)));
 
     // Enviar mensaje de conexión sin guardarlo en la base de datos
-    socket.to(room).emit("message", {
-      username: "Sistema",
-      text: `${username} se ha unido a la sala`,
-      timestamp: new Date(),
-      type: "system",
-    });
-  });
+
 
   socket.on("directMessage", async ({ from, to, message }) => {
     const toSocketId = userSockets.get(to);
@@ -149,13 +143,7 @@ io.on("connection", (socket) => {
     }
 
     // Enviar mensaje de desconexión sin guardarlo en la base de datos
-    socket.to(room).emit("message", {
-      username: "Sistema",
-      text: `${username} ha dejado la sala`,
-      timestamp: new Date(),
-      type: "system",
-    });
-  });
+ 
 
   socket.on("disconnect", () => {
     let disconnectedUsername;
