@@ -51,7 +51,7 @@ app.get("/api/messages/:room", async (req, res) => {
   try {
     const messages = await Message.find({
       room: req.params.room,
-      type: { $ne: "system" }, // Excluir mensajes del sistema
+      type: { $ne: "system" },
     })
       .sort({ timestamp: -1 })
       .limit(50);
@@ -74,9 +74,7 @@ io.on("connection", (socket) => {
     roomUsers.get(room).add(username);
 
     io.to(room).emit("roomUsers", Array.from(roomUsers.get(room)));
-
-    // Enviar mensaje de conexión sin guardarlo en la base de datos
-
+  });
 
   socket.on("directMessage", async ({ from, to, message }) => {
     const toSocketId = userSockets.get(to);
@@ -141,9 +139,7 @@ io.on("connection", (socket) => {
         io.to(room).emit("roomUsers", Array.from(roomUsers.get(room)));
       }
     }
-
-    // Enviar mensaje de desconexión sin guardarlo en la base de datos
- 
+  });
 
   socket.on("disconnect", () => {
     let disconnectedUsername;
@@ -160,14 +156,6 @@ io.on("connection", (socket) => {
         if (users.has(disconnectedUsername)) {
           users.delete(disconnectedUsername);
           io.to(room).emit("roomUsers", Array.from(users));
-
-          // Enviar mensaje de desconexión sin guardarlo
-          io.to(room).emit("message", {
-            username: "Sistema",
-            text: `${disconnectedUsername} se ha desconectado`,
-            timestamp: new Date(),
-            type: "system",
-          });
         }
       }
     }
