@@ -15,7 +15,7 @@ const userSocketMap = new Map(); // Mapeo de usuarios a sus sockets
 
 app.use(
   cors({
-    origin: process.env.DESARROLLOFRONT,
+    origin: process.env.PRODUCCIONFRONT,
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type"],
@@ -24,7 +24,7 @@ app.use(
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.DESARROLLOFRONT,
+    origin: process.env.PRODUCCIONFRONT,
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type"],
