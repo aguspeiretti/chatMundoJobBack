@@ -17,18 +17,6 @@ const messageSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  isPrivate: {
-    type: Boolean,
-    default: false,
-  },
-  to: {
-    type: String,
-    default: null,
-  },
-  isSystemMessage: {
-    type: Boolean,
-    default: false,
-  },
 });
 
 module.exports = mongoose.model("Message", messageSchema);
