@@ -55,6 +55,7 @@ app.use(express.json());
 app.get("/api/rooms", (req, res) => {
   res.json(Array.from(activeRooms));
 });
+console.log("hola");
 
 app.get("/api/messages/:room", async (req, res) => {
   try {
