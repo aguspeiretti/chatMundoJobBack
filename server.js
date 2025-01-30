@@ -4,21 +4,30 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-const Message = require("./models/Message");
+
 const cors = require("cors");
 
-const activeRooms = new Set(["General", "Random", "Ayuda"]);
+const activeRooms = new Set([
+  "Ventas",
+  "Coordinacion",
+  "Gestion",
+  "Marketing",
+  "Contabilidad",
+  "RRHH",
+]);
 require("dotenv").config();
 
 app.use(
   cors({
     origin: "https://chatmundojob.onrender.com",
+    // origin: "http://localhost:5173",
   })
 );
 
 const io = new Server(server, {
   cors: {
     origin: "https://chatmundojob.onrender.com",
+    // origin: "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type"],
@@ -131,7 +140,16 @@ io.on("connection", (socket) => {
       roomUsers.get(room).delete(username);
       if (roomUsers.get(room).size === 0) {
         roomUsers.delete(room);
-        if (!["General", "Random", "Ayuda"].includes(room)) {
+        if (
+          ![
+            "Ventas",
+            "Coordinacion",
+            "Gestion",
+            "Marketing",
+            "Contabilidad",
+            "RRHH",
+          ].includes(room)
+        ) {
           activeRooms.delete(room);
           io.emit("roomsUpdated", Array.from(activeRooms));
         }
