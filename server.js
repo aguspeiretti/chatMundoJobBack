@@ -8,6 +8,7 @@ const Message = require("./models/Message");
 const cors = require("cors");
 
 const activeRooms = new Set([
+  "Jobers",
   "Ventas",
   "Coordinacion",
   "Gestion",
@@ -143,6 +144,7 @@ io.on("connection", (socket) => {
         roomUsers.delete(room);
         if (
           ![
+            "Jobers",
             "Ventas",
             "Coordinacion",
             "Gestion",
