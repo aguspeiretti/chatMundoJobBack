@@ -4,7 +4,7 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-
+const Message = require("./models/Message");
 const cors = require("cors");
 
 const activeRooms = new Set([
